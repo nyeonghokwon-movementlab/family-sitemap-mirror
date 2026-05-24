@@ -1,0 +1,34 @@
+  name: Mirror MVL sitemap
+
+  on:
+    schedule:
+      - cron: '0 18 * * *'   # UTC 18:00 = KST 새벽 3시
+    workflow_dispatch:        # 수동 실행 버튼                                                                                       
+                                                                                                                                     
+  permissions:                                                                                                                       
+    contents: write                                                                                                                  
+                  
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+                                                                                                                                     
+        - name: Fetch sitemap and build mapping.json
+          run: |                                                                                                                     
+            curl -s https://movementlab.kr/sitemap.xml \
+              | grep -oE '<loc>https://movementlab\.kr/product/[^<]+</loc>' \
+              | sed -E 's|<loc>https://movementlab\.kr/product/([^/]+)/([0-9]+)/.*</loc>|"\1":\2|' \                                 
+              | sort -u \                                                                                                            
+              | paste -sd ',' - \                                                                                                    
+              | sed 's/^/{/; s/$/}/' > mapping.json                                                                                  
+                                                                                                                                     
+            echo "Entries: $(grep -o '":' mapping.json | wc -l)"
+            head -c 300 mapping.json; echo                                                                                           
+                                                                                                                                     
+        - name: Commit if changed
+          run: |                                                                                                                     
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add mapping.json
+            git diff --cached --quiet || (git commit -m "update mapping $(date -u +%Y-%m-%d)" && git push)
