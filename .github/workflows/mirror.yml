@@ -1,34 +1,34 @@
-  name: Mirror MVL sitemap                                                                                                           
-                                                                                                                                     
-  on:                                                                                                                              
-    schedule:                                                                                                                        
-      - cron: '0 18 * * *'                                                                                                           
-    workflow_dispatch:                                                                                                             
-                                                                                                                                     
-  permissions:                                              
-    contents: write                                                                                                                
+name: Mirror MVL sitemap
 
-  jobs:
-    build:
-      runs-on: ubuntu-latest
-      steps:                                  
-        - uses: actions/checkout@v4       
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
 
-        - name: Build mapping.json                                                                                                   
-          run: |
-            python3 - <<'PYEOF'                                                                                                      
-            import urllib.request, re, json                 
-            xml = urllib.request.urlopen('https://movementlab.kr/sitemap.xml').read().decode('utf-8')                              
-            matches = re.findall(r'<loc>https://movementlab\.kr/product/([^/]+)/(\d+)/', xml)
-            mapping = {slug: int(no) for slug, no in matches}                                                                        
-            with open('mapping.json', 'w', encoding='utf-8') as f:
-                json.dump(mapping, f, ensure_ascii=False, separators=(',', ':'))                                                     
-            print(f"Entries: {len(mapping)}")                                                                                        
-            PYEOF                                                                                                                  
-                                                                                                                                     
-        - name: Commit if changed                           
-          run: |                                                                                                                     
-            git config user.name "github-actions[bot]"      
-            git config user.email "github-actions[bot]@users.noreply.github.com"                                                     
-            git add mapping.json                            
-            git diff --cached --quiet || (git commit -m "update mapping" && git push)
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build mapping.json
+        run: |
+          python3 - <<'PYEOF'
+          import urllib.request, re, json
+          xml = urllib.request.urlopen('https://movementlab.kr/sitemap.xml').read().decode('utf-8')
+          matches = re.findall(r'<loc>https://movementlab\.kr/product/([^/]+)/(\d+)/', xml)
+          mapping = {slug: int(no) for slug, no in matches}
+          with open('mapping.json', 'w', encoding='utf-8') as f:
+              json.dump(mapping, f, ensure_ascii=False, separators=(',', ':'))
+          print(f"Entries: {len(mapping)}")
+          PYEOF
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add mapping.json
+          git diff --cached --quiet || (git commit -m "update mapping" && git push)
