@@ -17,10 +17,14 @@ jobs:
       - name: Build mapping.json
         run: |
           python3 - <<'PYEOF'
-          import urllib.request, re, json
-          xml = urllib.request.urlopen('https://movementlab.kr/sitemap.xml').read().decode('utf-8')
+          import urllib.request, re, json, sys
+          # Cloudflare blocks the default Python-urllib UA (error 1010)
+          req = urllib.request.Request('https://movementlab.kr/sitemap.xml', headers={'User-Agent': 'Mozilla/5.0 (compatible; family-sitemap-mirror/1.0)'})
+          xml = urllib.request.urlopen(req, timeout=60).read().decode('utf-8')
           matches = re.findall(r'<loc>https://movementlab\.kr/product/([^/]+)/(\d+)/', xml)
           mapping = {slug: int(no) for slug, no in matches}
+          if not mapping:
+              sys.exit('No product URLs parsed; keeping existing mapping.json')
           with open('mapping.json', 'w', encoding='utf-8') as f:
               json.dump(mapping, f, ensure_ascii=False, separators=(',', ':'))
           print(f"Entries: {len(mapping)}")
