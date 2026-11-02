@@ -1,10 +1,11 @@
 name: Mirror MVL sitemap
 
 on:
-  # 정시 실행은 GCP Cloud Scheduler(sitemap-mirror-daily, 11:00 KST)가 workflow_dispatch 로 한다.
-  # 아래 예약은 그게 실패했을 때를 위한 백업(GitHub 예약은 2~6시간 늦게 돈다).
+  # 11:00 KST 갱신. GitHub 예약은 2~6시간 늦게 시작하므로 일찍 걸어 두고
+  # 'Wait until 11:00 KST' 단계에서 11시까지 기다린다. 두 번째는 첫 번째가 빠질 때 대비.
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '30 20 * * *'  # 05:30 KST
+    - cron: '0 22 * * *'   # 07:00 KST (backup)
   workflow_dispatch:
     inputs:
       dry_run:
@@ -22,7 +23,15 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 355
     steps:
+      - name: Wait until 11:00 KST
+        run: |
+          target=$(TZ=Asia/Seoul date -d "$(TZ=Asia/Seoul date +%F) 11:00:00" +%s)
+          wait=$(( target - $(date +%s) ))
+          echo "now $(TZ=Asia/Seoul date '+%F %T') KST, target $(TZ=Asia/Seoul date -d @$target '+%F %T') KST, wait ${wait}s"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$wait" -gt 0 ]; then sleep "$wait"; fi
+
       - uses: actions/checkout@v4
 
       - name: Build mapping.json
