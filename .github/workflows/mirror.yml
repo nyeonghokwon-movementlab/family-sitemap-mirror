@@ -2,7 +2,7 @@ name: Mirror MVL sitemap
 
 on:
   schedule:
-    - cron: '0 18 * * *'
+    - cron: '0 2 * * *'  # 11:00 KST
   workflow_dispatch:
 
 permissions:
