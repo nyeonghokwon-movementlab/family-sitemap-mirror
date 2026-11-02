@@ -1,9 +1,20 @@
 name: Mirror MVL sitemap
 
 on:
+  # 정시 실행은 GCP Cloud Scheduler(sitemap-mirror-daily, 11:00 KST)가 workflow_dispatch 로 한다.
+  # 아래 예약은 그게 실패했을 때를 위한 백업(GitHub 예약은 2~6시간 늦게 돈다).
   schedule:
-    - cron: '0 2 * * *'  # 11:00 KST
+    - cron: '0 2 * * *'
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build only, do not commit'
+        type: boolean
+        default: false
+
+concurrency:
+  group: mirror
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -25,14 +36,34 @@ jobs:
           mapping = {slug: int(no) for slug, no in matches}
           if not mapping:
               sys.exit('No product URLs parsed; keeping existing mapping.json')
+          try:
+              old = json.load(open('mapping.json', encoding='utf-8'))
+          except Exception:
+              old = {}
+          added = sorted(set(mapping) - set(old))
+          removed = sorted(set(old) - set(mapping))
           with open('mapping.json', 'w', encoding='utf-8') as f:
-              json.dump(mapping, f, ensure_ascii=False, separators=(',', ':'))
-          print(f"Entries: {len(mapping)}")
+              json.dump(mapping, f, ensure_ascii=False, separators=(',',':'))
+          print(f"Entries: {len(mapping)} (added {len(added)}, removed {len(removed)})")
+          print("added:", added[:50])
+          print("removed:", removed[:50])
           PYEOF
 
       - name: Commit if changed
+        id: commit
+        if: ${{ inputs.dry_run != true }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add mapping.json
-          git diff --cached --quiet || (git commit -m "update mapping" && git push)
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "update mapping" && git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Purge jsDelivr cache
+        if: ${{ steps.commit.outputs.changed == 'true' }}
+        continue-on-error: true
+        run: curl -fsS --retry 3 --retry-delay 5 "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@main/mapping.json"
